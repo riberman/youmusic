@@ -1,0 +1,4 @@
+# Remove downloaded_music folder
+!downloaded_music/
+
+downloaded_music/*
