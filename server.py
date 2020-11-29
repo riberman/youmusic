@@ -1,9 +1,13 @@
 from __future__ import unicode_literals
 import youtube_dl
 
+ydl_opts = {}
+
+print("Insert folder")
+folder = input()
 
 ydl_opts = {
-    'outtmpl': 'downloaded_music/%(title)s-%(id)s.%(ext)s',
+    'outtmpl': folder + '/%(title)s-%(id)s.%(ext)s',
     'format': 'bestaudio/best',
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
