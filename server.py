@@ -1,19 +1,40 @@
+# libs
 from __future__ import unicode_literals
-import youtube_dl
 import time
+
+# youtube_dl downloader
+import youtube_dl
+
+# multiprocessing
 from multiprocessing import Process, Manager
+
+# http server
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 
+# socket
+import socket
+import threading
+
 ydl_opts = {}
+
+# Create Manage to share values in process
+manager = Manager()
+youtube_queue = manager.dict()
+list_of_clients = manager.list()
+boolean = manager.dict()
+boolean["flag"] = True
 
 host_name = "localhost"
 http_port = 9000
-socket_port = 9001
+socket_port = 9007
 
-notify_client_uuid = ''
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server = sock.bind((host_name, socket_port))
+sock.listen(100)
+print(time.asctime(), "Socket Server Starts - %s:%s" % (host_name, socket_port))
 
-def make_handler(youtube_queue):
+def make_handler():
 
     class YouMusicServer(BaseHTTPRequestHandler):
 
@@ -31,7 +52,7 @@ def make_handler(youtube_queue):
             try:
                 resp_json = json.loads(post_body)
 
-                youtube_queue[resp_json["url"]] = {"folder": resp_json["folder"], "client_uuid": resp_json["client_uuid"]}
+                youtube_queue[resp_json["url"]] = {"folder": resp_json["folder"]}
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
@@ -47,21 +68,51 @@ def make_handler(youtube_queue):
 
     return YouMusicServer
 
-def my_hook(d):
-    global notify_client_uuid
-    if d['status'] == 'finished':
-        notify_uuid = ''
-        print("Done downloading")
-    if d['status'] == 'downloading':
-        print(d['filename'], d['_percent_str'])
+def clientThread(connection, address):
+    connection.send(str("You are connected!").encode())
+    client_active = True
+    while client_active:
+        try:
+            received = connection.recv(2048).decode()
 
-def workerYoutubeDownloader(youtube_queue):
-    while True:
+            if received:
+                if received != "exit":
+                    message =  str(address[0] + " >>> " + received)
+                    broadcast(message)
+                else:
+                    print(address[0] + " Disconnected")
+                    broadcast("exit")
+                    remove(connection)
+                    client_active = False
+
+        except Exception as e:
+            print(e)
+
+def broadcast(message):
+    for client in list_of_clients:
+        try:
+            print(message)
+            client.send(str(message).encode())
+        except Exception as e:
+            print(e)
+            client.close()
+            remove(client)
+
+def remove(connection):
+    if connection in list_of_clients:
+        list_of_clients.remove(connection)
+
+def my_hook(d):
+    if d['status'] == 'finished':
+        broadcast(time.asctime() + " - Done downloading")
+    if d['status'] == 'downloading':
+        broadcast(time.asctime() + " - " + d['filename'] + " - " + d['_percent_str'])
+
+def workerYoutubeDownloader():
+    while boolean["flag"]:
         if (len(youtube_queue) > 0):
             print(time.asctime(), "workerYoutubeDownloader - Begin job")
             job = next(iter(youtube_queue.copy()))
-            global notifynotify_client_uuid_uuid
-            notify_client_uuid = youtube_queue[job]['client_uuid']
             ydl_opts = {
                 'outtmpl': 'downloaded_music/' + youtube_queue[job]['folder'] + '/%(title)s-%(id)s.%(ext)s',
                 'format': 'bestaudio/best',
@@ -82,24 +133,42 @@ def workerYoutubeDownloader(youtube_queue):
             print(time.asctime(), "workerYoutubeDownloader - No jobs")
         time.sleep(5)
 
-def startServer(youtube_queue):
+def startServer():
     print(time.asctime(), "Server Starts - %s:%s" % (host_name, http_port))
-    myServer = HTTPServer((host_name, http_port), make_handler(youtube_queue))
+    myServer = HTTPServer((host_name, http_port), make_handler())
     myServer.serve_forever()
+
+def startSocketServer():
+    while boolean["flag"]:
+        print(time.asctime(), "startSocketServer - wait new client")
+        connection, address = sock.accept()
+        list_of_clients.append(connection)
+        print(address[0] + " connected on server")
+        #threading.Thread(target=clientThread, args=(connection, address,)).start()
+        p1 = Process(target=clientThread, args=(connection, address,))
+        p1.start()
+    p1.terminate()
 
 if __name__ == '__main__':
     try:
-        manager = Manager()
-        youtube_queue = manager.dict()
-        p1 = Process(target=startServer, args=(youtube_queue,))
-        p2 = Process(target=workerYoutubeDownloader, args=(youtube_queue,))
+        p1 = Process(target=startSocketServer)
+        p2 = Process(target=startServer)
+        p3 = Process(target=workerYoutubeDownloader)
         p1.start()
         p2.start()
+        p3.start()
         p1.join()
         p2.join()
+        p3.join()
     except KeyboardInterrupt:
         pass
+        broadcast("exit")
         myServer.server_close()
-        print(time.asctime(), "Server Stops - %s:%s" % (host_name, http_port))
+        print(time.asctime(), "Server Stop - %s:%s" % (host_name, http_port))
         p1.terminate()
         p2.terminate()
+        p3.terminate()
+        server.shutdown(sock.SHUT_RDWR)
+        server.close()
+        print(time.asctime(), "Socket Server Stop - %s:%s" % (host_name, socket_port))
+        boolean["flag"] = False
