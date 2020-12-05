@@ -17,28 +17,31 @@ def make_handler(youtube_queue):
         def do_GET(self):
             print(time.asctime(), "YouMusicServer - New GET Resquest")
             self.send_response(200)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(bytes("<html><head><title>Title goes here.</title></head>", "utf-8"))
-            self.wfile.write(bytes("<body><p>This is a test.</p>", "utf-8"))
-            self.wfile.write(bytes("<input type='file'><audio controls></audio><script>var input = document.querySelector('input[type=file]');var audio = document.querySelector('audio');input.onchange = function() {audio.src = URL.createObjectURL(input.files[0]);}</script>", "utf-8"))
-            self.wfile.write(bytes("</body></html>", "utf-8"))
+            self.wfile.write(bytes("{\"name\": \"youmusicserver\",\n \"status\": \"ok\"}", "utf-8"))
 
         def do_POST(self):
             print(time.asctime(), "YouMusicServer - New POST Resquest")
             content_len = int(self.headers.get('Content-Length'))
             post_body = self.rfile.read(content_len).decode("utf8")
-            respJson = json.loads(post_body)
+            try:
+                respJson = json.loads(post_body)
 
-            youtube_queue[respJson["url"]] = {"folder": respJson["folder"]}
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            self.wfile.write(bytes("<html><head><title>Title goes here.</title></head>", "utf-8"))
-            self.wfile.write(bytes("<body><p>This is a test.</p>", "utf-8"))
-            self.wfile.write(bytes("<p>You accessed path: %s</p><br>" % self.path, "utf-8"))
-            self.wfile.write(bytes("<p>youtube_queue: %s</p>" % youtube_queue, "utf-8"))
-            self.wfile.write(bytes("</body></html>", "utf-8"))
+                youtube_queue[respJson["url"]] = {"folder": respJson["folder"], "client_uuid": respJson["client_uuid"]}
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                response = bytes("{\"name\": \"youmusicserver\",\n \"status\": \"ok\",\n \"url\": \"%s\",\n \"folder\": \"%s\"}" % (respJson["url"], respJson["folder"]), "utf-8")
+
+            except Exception as e:
+                self.send_response(400)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                response = bytes("{\"name\": \"youmusicserver\",\n \"status\": \"bad request\"}", "utf-8")
+
+            self.wfile.write(response)
+
     return YouMusicServer
 
 def my_hook(d):
