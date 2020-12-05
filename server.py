@@ -144,7 +144,6 @@ def startSocketServer():
         connection, address = sock.accept()
         list_of_clients.append(connection)
         print(address[0] + " connected on server")
-        #threading.Thread(target=clientThread, args=(connection, address,)).start()
         p1 = Process(target=clientThread, args=(connection, address,))
         p1.start()
     p1.terminate()
