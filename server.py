@@ -9,6 +9,9 @@ ydl_opts = {}
 
 host_name = "localhost"
 http_port = 9000
+socket_port = 9001
+
+notify_client_uuid = ''
 
 def make_handler(youtube_queue):
 
@@ -45,7 +48,9 @@ def make_handler(youtube_queue):
     return YouMusicServer
 
 def my_hook(d):
+    global notify_client_uuid
     if d['status'] == 'finished':
+        notify_uuid = ''
         print("Done downloading")
     if d['status'] == 'downloading':
         print(d['filename'], d['_percent_str'])
@@ -55,6 +60,8 @@ def workerYoutubeDownloader(youtube_queue):
         if (len(youtube_queue) > 0):
             print(time.asctime(), "workerYoutubeDownloader - Begin job")
             job = next(iter(youtube_queue.copy()))
+            global notifynotify_client_uuid_uuid
+            notify_client_uuid = youtube_queue[job]['client_uuid']
             ydl_opts = {
                 'outtmpl': 'downloaded_music/' + youtube_queue[job]['folder'] + '/%(title)s-%(id)s.%(ext)s',
                 'format': 'bestaudio/best',
