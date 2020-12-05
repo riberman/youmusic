@@ -7,8 +7,8 @@ import json
 
 ydl_opts = {}
 
-hostName = "localhost"
-hostPort = 9000
+host_name = "localhost"
+http_port = 9000
 
 def make_handler(youtube_queue):
 
@@ -26,13 +26,13 @@ def make_handler(youtube_queue):
             content_len = int(self.headers.get('Content-Length'))
             post_body = self.rfile.read(content_len).decode("utf8")
             try:
-                respJson = json.loads(post_body)
+                resp_json = json.loads(post_body)
 
-                youtube_queue[respJson["url"]] = {"folder": respJson["folder"], "client_uuid": respJson["client_uuid"]}
+                youtube_queue[resp_json["url"]] = {"folder": resp_json["folder"], "client_uuid": resp_json["client_uuid"]}
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                response = bytes("{\"name\": \"youmusicserver\",\n \"status\": \"ok\",\n \"url\": \"%s\",\n \"folder\": \"%s\"}" % (respJson["url"], respJson["folder"]), "utf-8")
+                response = bytes("{\"name\": \"youmusicserver\",\n \"status\": \"ok\",\n \"url\": \"%s\",\n \"folder\": \"%s\"}" % (resp_json["url"], resp_json["folder"]), "utf-8")
 
             except Exception as e:
                 self.send_response(400)
@@ -50,10 +50,10 @@ def my_hook(d):
     if d['status'] == 'downloading':
         print(d['filename'], d['_percent_str'])
 
-def workerYoutbeDownloader(youtube_queue):
+def workerYoutubeDownloader(youtube_queue):
     while True:
         if (len(youtube_queue) > 0):
-            print(time.asctime(), "workerYoutbeDownloader - Begin job")
+            print(time.asctime(), "workerYoutubeDownloader - Begin job")
             job = next(iter(youtube_queue.copy()))
             ydl_opts = {
                 'outtmpl': 'downloaded_music/' + youtube_queue[job]['folder'] + '/%(title)s-%(id)s.%(ext)s',
@@ -70,14 +70,14 @@ def workerYoutbeDownloader(youtube_queue):
                     ydl.download([job])
                 del youtube_queue[job]
             except Exception as e:
-                print(time.asctime(), "workerYoutbeDownloader - " + str(e))
+                print(time.asctime(), "workerYoutubeDownloader - " + str(e))
         else:
-            print(time.asctime(), "workerYoutbeDownloader - No jobs")
+            print(time.asctime(), "workerYoutubeDownloader - No jobs")
         time.sleep(5)
 
 def startServer(youtube_queue):
-    print(time.asctime(), "Server Starts - %s:%s" % (hostName, hostPort))
-    myServer = HTTPServer((hostName, hostPort), make_handler(youtube_queue))
+    print(time.asctime(), "Server Starts - %s:%s" % (host_name, http_port))
+    myServer = HTTPServer((host_name, http_port), make_handler(youtube_queue))
     myServer.serve_forever()
 
 if __name__ == '__main__':
@@ -85,7 +85,7 @@ if __name__ == '__main__':
         manager = Manager()
         youtube_queue = manager.dict()
         p1 = Process(target=startServer, args=(youtube_queue,))
-        p2 = Process(target=workerYoutbeDownloader, args=(youtube_queue,))
+        p2 = Process(target=workerYoutubeDownloader, args=(youtube_queue,))
         p1.start()
         p2.start()
         p1.join()
@@ -93,6 +93,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
         myServer.server_close()
-        print(time.asctime(), "Server Stops - %s:%s" % (hostName, hostPort))
+        print(time.asctime(), "Server Stops - %s:%s" % (host_name, http_port))
         p1.terminate()
         p2.terminate()
